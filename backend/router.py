@@ -14,8 +14,9 @@ async def get_main_room_types():
     Возвращает:
     - name: название типа номера
     - description: описание типа номера
-    - price: цена типа номера
+    - price: цена (из position)
     - adult_bed: количество взрослых кроватей (из occupancy)
+    - image: URL первого изображения номера
     
     Данные синхронизируются с TravelLine API каждые 2 минуты.
     """
