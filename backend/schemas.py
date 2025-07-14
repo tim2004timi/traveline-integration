@@ -3,6 +3,7 @@ from typing import Optional, List
 
 
 class MainRoomType(BaseModel):
+    id: str
     name: str
     description: Optional[str] = None
     price: Optional[int] = None
@@ -13,11 +14,26 @@ class MainRoomType(BaseModel):
         from_attributes = True
 
 class CatalogRoomType(BaseModel):
+    id: str
     name: str
     description: Optional[str] = None
     price: int = 2700
     amenities: List[str] = []
     image: Optional[str] = None
+    size: Optional[float] = None
+    category: Optional[str] = None
+    adult_bed: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class RoomTypeInfo(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    price: int = 2700
+    amenities: List[str] = []
+    images: List[str] = []
     size: Optional[float] = None
     category: Optional[str] = None
     adult_bed: Optional[int] = None

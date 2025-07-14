@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
-from schemas import MainRoomType, CatalogRoomType
-from service import get_room_types, get_catalog_room_types, get_catalog_room_types_filtered
+from schemas import MainRoomType, CatalogRoomType, RoomTypeInfo
+from service import get_room_types, get_catalog_room_types, get_catalog_room_types_filtered, get_room_type_info, get_similar_room_types
 
 router = APIRouter()
 
@@ -58,3 +58,25 @@ async def get_catalog_room_types_endpoint(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения данных: {str(e)}")
+
+@router.get("/info/room-types/{room_id}", response_model=RoomTypeInfo)
+async def get_room_type_info_endpoint(room_id: str):
+    """
+    Получить подробную информацию о типе номера по его room_id.
+    """
+    info = await get_room_type_info(room_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Room type not found")
+    return info
+
+@router.get("/similar/room-types/{room_id}", response_model=List[MainRoomType])
+async def get_similar_room_types_endpoint(room_id: str):
+    """
+    Получить список похожих объектов (максимум 10) по room_id.
+    Логика:
+    1. Спальных мест столько же или больше (сортировка по разнице мест)
+    2. Размер похожий (сортировка по разнице размера)
+    3. Цена похожая (сортировка по разнице цены)
+    """
+    result = await get_similar_room_types(room_id)
+    return result

@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, asc, desc
 from models import RoomType, Occupancy, RoomTypeImage, Amenity
-from schemas import MainRoomType, CatalogRoomType
+from schemas import MainRoomType, CatalogRoomType, RoomTypeInfo
 from database import async_session
 
 
@@ -31,6 +31,7 @@ async def get_room_types() -> List[MainRoomType]:
             first_image = image_result.scalar()
             
             main_room_type = MainRoomType(
+                id=room_type.id,
                 name=room_type.name,
                 description=room_type.description,
                 price=2700,
@@ -75,6 +76,7 @@ async def get_catalog_room_types() -> List[CatalogRoomType]:
             adult_bed = occ_result.scalar()
 
             catalog.append(CatalogRoomType(
+                id=room_type.id,
                 name=room_type.name,
                 description=room_type.description,
                 price=2700,
@@ -146,6 +148,7 @@ async def get_catalog_room_types_filtered(
             amenities_result = await session.execute(amenities_query)
             amenities = [row[0] for row in amenities_result.all()]
             catalog.append(CatalogRoomType(
+                id=room_type.id,
                 name=room_type.name,
                 description=room_type.description,
                 price=price,
@@ -161,3 +164,89 @@ async def get_catalog_room_types_filtered(
         elif sort_by == "size":
             catalog.sort(key=lambda x: (x.size or 0))
         return catalog
+
+async def get_room_type_info(room_id: str) -> Optional[RoomTypeInfo]:
+    async with async_session() as session:
+        # Получаем RoomType
+        room_type = await session.get(RoomType, room_id)
+        if not room_type:
+            return None
+        # Все изображения
+        images_query = select(RoomTypeImage.url).where(
+            RoomTypeImage.room_type_id == room_id
+        ).order_by(RoomTypeImage.position)
+        images_result = await session.execute(images_query)
+        images = [row[0] for row in images_result.all()]
+        # Удобства
+        amenities_query = select(Amenity.code).where(
+            Amenity.room_type_id == room_id
+        )
+        amenities_result = await session.execute(amenities_query)
+        amenities = [row[0] for row in amenities_result.all()]
+        # Вместимость
+        occ_query = select(Occupancy.adult_bed).where(
+            Occupancy.room_type_id == room_id
+        )
+        occ_result = await session.execute(occ_query)
+        adult_bed = occ_result.scalar()
+        return RoomTypeInfo(
+            id=room_type.id,
+            name=room_type.name,
+            description=room_type.description,
+            price=2700,
+            amenities=amenities,
+            images=images,
+            size=room_type.size_value,
+            category=room_type.category_name,
+            adult_bed=adult_bed
+        )
+
+async def get_similar_room_types(room_id: str, limit: int = 10) -> List[MainRoomType]:
+    async with async_session() as session:
+        # Получаем исходный объект
+        room_type = await session.get(RoomType, room_id)
+        if not room_type:
+            return []
+        occ_query = select(Occupancy.adult_bed).where(Occupancy.room_type_id == room_id)
+        occ_result = await session.execute(occ_query)
+        base_adult_bed = occ_result.scalar() or 0
+        base_size = room_type.size_value or 0
+        base_price = room_type.position or 0
+        # Получаем все остальные объекты
+        query = select(RoomType, Occupancy).outerjoin(
+            Occupancy, RoomType.id == Occupancy.room_type_id
+        ).where(RoomType.id != room_id)
+        result = await session.execute(query)
+        candidates = []
+        for rtype, occ in result:
+            adult_bed = occ.adult_bed if occ else 0
+            if adult_bed < base_adult_bed:
+                continue  # только >= по местам
+            size = rtype.size_value or 0
+            price = rtype.position or 0
+            # Считаем разницу для сортировки
+            diff_adult_bed = adult_bed - base_adult_bed
+            diff_size = abs(size - base_size)
+            diff_price = abs((price or 0) - (base_price or 0))
+            # Получаем первое изображение
+            image_query = select(RoomTypeImage.url).where(
+                RoomTypeImage.room_type_id == rtype.id
+            ).order_by(RoomTypeImage.position).limit(1)
+            image_result = await session.execute(image_query)
+            first_image = image_result.scalar()
+            candidates.append({
+                "obj": MainRoomType(
+                    id=rtype.id,
+                    name=rtype.name,
+                    description=rtype.description,
+                    price=price,
+                    adult_bed=adult_bed,
+                    image=first_image
+                ),
+                "diff_adult_bed": diff_adult_bed,
+                "diff_size": diff_size,
+                "diff_price": diff_price
+            })
+        # Сортировка: сначала по diff_adult_bed, потом по diff_size, потом по diff_price
+        candidates.sort(key=lambda x: (x["diff_adult_bed"], x["diff_size"], x["diff_price"]))
+        return [c["obj"] for c in candidates[:limit]]
