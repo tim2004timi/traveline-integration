@@ -22,7 +22,5 @@ async def sync_task():
 
 
 def start_sync_task():
-    """Запускает задачу синхронизации в отдельном потоке"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(sync_task()) 
+    """Запускает задачу синхронизации в фоне"""
+    asyncio.create_task(sync_task()) 

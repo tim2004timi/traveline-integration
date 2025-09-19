@@ -1,7 +1,8 @@
 import httpx
 import asyncio
+import redis.asyncio as redis
 from config import Settings
-from database import async_session, redis
+from database import async_session
 from models import RoomType, RoomTypeImage, Amenity, Address, Occupancy, Placement
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,12 +11,18 @@ import logging
 settings = Settings()
 logger = logging.getLogger(__name__)
 
+async def get_redis_client():
+    """Создает новый Redis клиент для текущего event loop"""
+    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+
 async def fetch_jwt():
     cache_key = "traveline_access_token"
     try:
-        token = await redis.get(cache_key)
+        redis_client = await get_redis_client()
+        token = await redis_client.get(cache_key)
         if token:
             logger.info("fetch_jwt: token получен из кеша")
+            await redis_client.close()
             return token
 
         async with httpx.AsyncClient() as client:
@@ -27,7 +34,8 @@ async def fetch_jwt():
             resp = await client.post(settings.TRAVELINE_AUTH_URL, data=data)
             resp.raise_for_status()
             token = resp.json()["access_token"]
-            await redis.set(cache_key, token, ex=14 * 60)
+            await redis_client.set(cache_key, token, ex=14 * 60)
+            await redis_client.close()
             logger.info("fetch_jwt: token успешно получен через API и сохранён в кеш")
             return token
     except Exception as e:

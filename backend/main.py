@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-import threading
+import asyncio
 
 from parser import fetch_and_save_room_types
 from router import router
@@ -19,10 +19,9 @@ async def lifespan(app: FastAPI):
         await fetch_and_save_room_types()
         logger.info("Room types successfully fetched and saved.")
         
-        # Запускаем задачу синхронизации в отдельном потоке
-        sync_thread = threading.Thread(target=start_sync_task, daemon=True)
-        sync_thread.start()
-        logger.info("Синхронизация запущена в отдельном потоке")
+        # Запускаем задачу синхронизации в фоне
+        start_sync_task()
+        logger.info("Синхронизация запущена в фоне")
         
     except Exception as e:
         logger.error(f"Error during initial fetch: {e}")
