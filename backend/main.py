@@ -7,6 +7,8 @@ import asyncio
 from parser import fetch_and_save_room_types
 from router import router
 from scheduler import start_sync_task
+from database import engine
+from models import Base
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -14,8 +16,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("App startup: fetching and saving room types from TravelLine API...")
+    logger.info("App startup: creating database tables...")
     try:
+        # Создаем таблицы в БД
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created successfully")
+        
+        logger.info("Fetching and saving room types from TravelLine API...")
         await fetch_and_save_room_types()
         logger.info("Room types successfully fetched and saved.")
         
@@ -24,7 +32,7 @@ async def lifespan(app: FastAPI):
         logger.info("Синхронизация запущена в фоне")
         
     except Exception as e:
-        logger.error(f"Error during initial fetch: {e}")
+        logger.error(f"Error during startup: {e}")
     yield
     logger.info("App shutdown.")
 
