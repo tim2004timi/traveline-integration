@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import datetime
 
 
 class MainRoomType(BaseModel):
@@ -37,6 +38,42 @@ class RoomTypeInfo(BaseModel):
     size: Optional[float] = None
     category: Optional[str] = None
     adult_bed: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class FeedbackBase(BaseModel):
+    text: str
+    rate: int = Field(..., ge=0, le=5, description="Рейтинг от 0 до 5")
+
+
+class FeedbackCreate(FeedbackBase):
+    pass
+
+
+class Feedback(FeedbackBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VideoFeedbackBase(BaseModel):
+    file: str
+    rate: int = Field(..., ge=0, le=5, description="Рейтинг от 0 до 5")
+
+
+class VideoFeedbackCreate(VideoFeedbackBase):
+    pass
+
+
+class VideoFeedback(VideoFeedbackBase):
+    uuid: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

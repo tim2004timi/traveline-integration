@@ -9,6 +9,7 @@ from router import router
 from scheduler import start_sync_task
 from database import engine
 from models import Base
+from telegram import start_bot_task
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,10 @@ async def lifespan(app: FastAPI):
         # Запускаем задачу синхронизации в фоне
         start_sync_task()
         logger.info("Синхронизация запущена в фоне")
+        
+        # Запускаем Telegram бота
+        start_bot_task()
+        logger.info("Telegram bot запущен")
         
     except Exception as e:
         logger.error(f"Error during startup: {e}")

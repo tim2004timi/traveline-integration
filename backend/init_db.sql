@@ -66,10 +66,32 @@ CREATE TABLE IF NOT EXISTS placements (
     FOREIGN KEY (room_type_id) REFERENCES room_types(id) ON DELETE CASCADE
 );
 
+-- Создание таблицы feedbacks
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id SERIAL PRIMARY KEY,
+    text TEXT NOT NULL,
+    rate INTEGER NOT NULL CHECK (rate >= 0 AND rate <= 5),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Создание таблицы video_feedbacks
+CREATE TABLE IF NOT EXISTS video_feedbacks (
+    uuid VARCHAR(36) PRIMARY KEY,
+    file VARCHAR(1024) NOT NULL,
+    rate INTEGER NOT NULL CHECK (rate >= 0 AND rate <= 5),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Создание индексов для улучшения производительности
 CREATE INDEX IF NOT EXISTS idx_room_type_images_room_type_id ON room_type_images(room_type_id);
 CREATE INDEX IF NOT EXISTS idx_amenities_room_type_id ON amenities(room_type_id);
 CREATE INDEX IF NOT EXISTS idx_placements_room_type_id ON placements(room_type_id);
+CREATE INDEX IF NOT EXISTS idx_feedbacks_rate ON feedbacks(rate);
+CREATE INDEX IF NOT EXISTS idx_feedbacks_created_at ON feedbacks(created_at);
+CREATE INDEX IF NOT EXISTS idx_video_feedbacks_rate ON video_feedbacks(rate);
+CREATE INDEX IF NOT EXISTS idx_video_feedbacks_created_at ON video_feedbacks(created_at);
 
 -- Создание триггера для автоматического обновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -83,5 +105,17 @@ $$ language 'plpgsql';
 DROP TRIGGER IF EXISTS update_room_types_updated_at ON room_types;
 CREATE TRIGGER update_room_types_updated_at 
     BEFORE UPDATE ON room_types 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_feedbacks_updated_at ON feedbacks;
+CREATE TRIGGER update_feedbacks_updated_at 
+    BEFORE UPDATE ON feedbacks 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_video_feedbacks_updated_at ON video_feedbacks;
+CREATE TRIGGER update_video_feedbacks_updated_at 
+    BEFORE UPDATE ON video_feedbacks 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();

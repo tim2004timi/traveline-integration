@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
+import uuid
 
 Base = declarative_base()
 
@@ -96,3 +97,23 @@ class Placement(Base):
     
     # Relationship
     room_type = relationship("RoomType", back_populates="placements")
+
+
+class Feedback(Base):
+    __tablename__ = "feedbacks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    text = Column(Text, nullable=False)
+    rate = Column(Integer, nullable=False)  # от 0 до 5
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class VideoFeedback(Base):
+    __tablename__ = "video_feedbacks"
+    
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    file = Column(String(1024), nullable=False)  # путь к файлу в MinIO
+    rate = Column(Integer, nullable=False)  # от 0 до 5
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -1,8 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, asc, desc
-from models import RoomType, Occupancy, RoomTypeImage, Amenity
-from schemas import MainRoomType, CatalogRoomType, RoomTypeInfo
+from sqlalchemy import select, and_, or_, asc, desc, delete
+from models import RoomType, Occupancy, RoomTypeImage, Amenity, Feedback as FeedbackModel, VideoFeedback as VideoFeedbackModel
+from schemas import MainRoomType, CatalogRoomType, RoomTypeInfo, FeedbackCreate, Feedback, VideoFeedbackCreate, VideoFeedback
 from database import async_session
 
 
@@ -250,3 +250,91 @@ async def get_similar_room_types(room_id: str, limit: int = 10) -> List[MainRoom
         # Сортировка: сначала по diff_adult_bed, потом по diff_size, потом по diff_price
         candidates.sort(key=lambda x: (x["diff_adult_bed"], x["diff_size"], x["diff_price"]))
         return [c["obj"] for c in candidates[:limit]]
+
+
+# CRUD операции для текстовых отзывов
+async def get_feedbacks() -> List[Feedback]:
+    """Получить все текстовые отзывы"""
+    async with async_session() as session:
+        query = select(FeedbackModel).order_by(FeedbackModel.created_at.desc())
+        result = await session.execute(query)
+        feedbacks = result.scalars().all()
+        return [Feedback.model_validate(feedback) for feedback in feedbacks]
+
+
+async def create_feedback(feedback_data: FeedbackCreate) -> Feedback:
+    """Создать новый текстовый отзыв"""
+    try:
+        async with async_session() as session:
+            feedback = FeedbackModel(
+                text=feedback_data.text,
+                rate=feedback_data.rate
+            )
+            session.add(feedback)
+            await session.commit()
+            await session.refresh(feedback)
+            return Feedback.model_validate(feedback)
+    except Exception as e:
+        print(f"Ошибка при создании отзыва: {e}")
+        raise
+
+
+async def delete_feedback(feedback_id: int) -> bool:
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                delete(FeedbackModel).where(FeedbackModel.id == feedback_id)
+            )
+            await session.commit()
+            affected = getattr(result, "rowcount", None)
+            return (affected or 0) > 0
+    except Exception as e:
+        print(f"Ошибка при удалении отзыва: {e}")
+        return False
+
+
+async def get_feedback_by_id(feedback_id: int) -> Optional[Feedback]:
+    """Получить текстовый отзыв по ID"""
+    async with async_session() as session:
+        query = select(FeedbackModel).where(FeedbackModel.id == feedback_id)
+        result = await session.execute(query)
+        fb = result.scalar_one_or_none()
+        return Feedback.model_validate(fb) if fb else None
+
+
+# CRUD операции для видео отзывов
+async def get_video_feedbacks() -> List[VideoFeedback]:
+    """Получить все видео отзывы"""
+    async with async_session() as session:
+        query = select(VideoFeedbackModel).order_by(VideoFeedbackModel.created_at.desc())
+        result = await session.execute(query)
+        return result.scalars().all()
+
+
+async def create_video_feedback(feedback_data: VideoFeedbackCreate) -> VideoFeedback:
+    """Создать новый видео отзыв"""
+    async with async_session() as session:
+        feedback = VideoFeedbackModel(
+            file=feedback_data.file,
+            rate=feedback_data.rate
+        )
+        session.add(feedback)
+        await session.commit()
+        await session.refresh(feedback)
+        return feedback
+
+
+async def delete_video_feedback(feedback_uuid: str) -> bool:
+    """Удалить видео отзыв по UUID"""
+    async with async_session() as session:
+        result = await session.execute(delete(VideoFeedbackModel).where(VideoFeedbackModel.uuid == feedback_uuid))
+        await session.commit()
+        return result.rowcount > 0
+
+
+async def get_video_feedback_by_uuid(feedback_uuid: str) -> Optional[VideoFeedback]:
+    """Получить видео отзыв по UUID"""
+    async with async_session() as session:
+        query = select(VideoFeedbackModel).where(VideoFeedbackModel.uuid == feedback_uuid)
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
